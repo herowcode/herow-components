@@ -2,6 +2,7 @@ import { Loader2 } from "lucide-react"
 import * as React from "react"
 import type { ControllerProps, FieldPath, FieldValues } from "react-hook-form"
 
+import { getEstados } from "@/actions/select-estado"
 import {
   Combobox,
   ComboboxContent,
@@ -26,53 +27,30 @@ interface IEstadoOption {
   value: string
 }
 
-const IBGE_API_URL =
-  "https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome"
-  
 // Module-level cache for estados (static data)
 let estadosCache: IEstadoOption[] | null = null
-let estadosFetchEntry: {
-  promise: Promise<IEstadoOption[]>
-  controller: AbortController
-} | null = null
+let estadosFetchPromise: Promise<IEstadoOption[]> | null = null
 
-async function fetchEstadosWithCache(
-  signal?: AbortSignal,
-): Promise<IEstadoOption[]> {
+async function fetchEstadosWithCache(): Promise<IEstadoOption[]> {
   if (estadosCache) return estadosCache
 
-  if (!estadosFetchEntry) {
-    const controller = new AbortController()
-    const promise = fetch(IBGE_API_URL, { signal: controller.signal })
+  if (!estadosFetchPromise) {
+    estadosFetchPromise = getEstados()
       .then((response) => {
-        if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
-        return response.json() as Promise<{ nome: string; sigla: string }[]>
-      })
-      .then((data) => {
-        const options = data.map((estado) => ({
+        const options = response.map((estado) => ({
           label: `${estado.nome} (${estado.sigla})`,
           value: estado.sigla,
         }))
         estadosCache = options
-        estadosFetchEntry = null
         return options
       })
       .catch((error) => {
-        estadosFetchEntry = null
+        estadosFetchPromise = null
         throw error
       })
-    estadosFetchEntry = { promise, controller }
   }
 
-  // If caller provided a signal, abort the shared request when caller aborts
-  signal?.addEventListener("abort", () => {
-    if (estadosFetchEntry) {
-      estadosFetchEntry.controller.abort()
-      estadosFetchEntry = null
-    }
-  })
-
-  return estadosFetchEntry.promise
+  return estadosFetchPromise
 }
 
 interface ISelectEstadoProps {
@@ -103,17 +81,17 @@ export function SelectEstado({
   React.useEffect(() => {
     if (estadosCache) return
 
-    const controller = new AbortController()
+    let cancelled = false
 
-    fetchEstadosWithCache(controller.signal)
+    fetchEstadosWithCache()
       .then((options) => {
-        if (!controller.signal.aborted) {
+        if (!cancelled) {
           setEstadosOptions(options)
           setLoading(false)
         }
       })
       .catch((err) => {
-        if (!controller.signal.aborted) {
+        if (!cancelled) {
           setError("Erro ao carregar estados")
           setLoading(false)
           console.error(err)
@@ -121,7 +99,7 @@ export function SelectEstado({
       })
 
     return () => {
-      controller.abort()
+      cancelled = true
     }
   }, [])
 

@@ -1,0 +1,16 @@
+{
+  "name"                : "optmized-image",
+  "description"         : "Componente de carregamento otimizado de imagens.",
+  "version"             : "1.0.0",
+  "registryDependencies": [""],
+  "dependencies"        : [],
+  "devDependencies"     : [],
+  "frameworks"          : {
+    "nextjs": {
+      "files": [ {"name": "optmized-image.tsx", "target": "components"} ]
+    },
+    "vite"  : {
+      "files": [ {"name": "optmized-image.tsx", "target": "components"} ]
+    }
+  }
+}

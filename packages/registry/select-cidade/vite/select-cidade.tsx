@@ -12,61 +12,58 @@ import {
 import { InputGroupAddon } from "@/components/ui/input-group"
 import { cn } from "@/lib/utils"
 
-interface IEstadoOption {
-  label: string
-  value: string
-}
+const IBGE_API_URL = (state: string) =>
+  `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${state}/municipios?orderBy=nome`
 
-const IBGE_API_URL =
-  "https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome"
-  
-// Module-level cache for estados (static data)
-let estadosCache: IEstadoOption[] | null = null
-let estadosFetchEntry: {
-  promise: Promise<IEstadoOption[]>
-  controller: AbortController
-} | null = null
+// Module-level cache for cidades by state
+const cidadesCache = new Map<string, string[]>()
+const cidadesFetchPromises = new Map<
+  string,
+  { promise: Promise<string[]>; controller: AbortController }
+>()
 
-async function fetchEstadosWithCache(
+async function fetchCidadesWithCache(
+  state: string,
   signal?: AbortSignal,
-): Promise<IEstadoOption[]> {
-  if (estadosCache) return estadosCache
+): Promise<string[]> {
+  const cached = cidadesCache.get(state)
+  if (cached) return cached
 
-  if (!estadosFetchEntry) {
+  let entry = cidadesFetchPromises.get(state)
+  if (!entry) {
     const controller = new AbortController()
-    const promise = fetch(IBGE_API_URL, { signal: controller.signal })
+    const promise = fetch(IBGE_API_URL(state), { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
-        return response.json() as Promise<{ nome: string; sigla: string }[]>
+        return response.json() as Promise<{ nome: string }[]>
       })
       .then((data) => {
-        const options = data.map((estado) => ({
-          label: `${estado.nome} (${estado.sigla})`,
-          value: estado.sigla,
-        }))
-        estadosCache = options
-        estadosFetchEntry = null
+        const options = data.map((cidade) => cidade.nome)
+        cidadesCache.set(state, options)
+        cidadesFetchPromises.delete(state)
         return options
       })
       .catch((error) => {
-        estadosFetchEntry = null
+        cidadesFetchPromises.delete(state)
         throw error
       })
-    estadosFetchEntry = { promise, controller }
+    entry = { promise, controller }
+    cidadesFetchPromises.set(state, entry)
   }
 
   // If caller provided a signal, abort the shared request when caller aborts
   signal?.addEventListener("abort", () => {
-    if (estadosFetchEntry) {
-      estadosFetchEntry.controller.abort()
-      estadosFetchEntry = null
+    const current = cidadesFetchPromises.get(state)
+    if (current) {
+      current.controller.abort()
+      cidadesFetchPromises.delete(state)
     }
   })
 
-  return estadosFetchEntry.promise
+  return entry.promise
 }
 
-interface ISelectEstadoProps {
+interface ISelectCidadeProps {
   value?: string
   onValueChange?: (value: string | null) => void
   placeholder?: string
@@ -74,38 +71,55 @@ interface ISelectEstadoProps {
   invalid?: boolean
   className?: string
   showClear?: boolean
+  state: string | null
 }
 
-export function SelectEstado({
+export function SelectCidade({
   value,
   onValueChange,
-  placeholder = "Selecione um estado...",
+  placeholder = "Selecione uma cidade...",
   disabled = false,
   invalid = false,
   className,
   showClear = false,
-}: ISelectEstadoProps) {
-  const [estadosOptions, setEstadosOptions] = React.useState<IEstadoOption[]>(
-    () => estadosCache ?? [],
+  state,
+}: ISelectCidadeProps) {
+  const [cidadesOptions, setCidadesOptions] = React.useState<string[]>(
+    () => (state ? cidadesCache.get(state) ?? [] : []),
   )
-  const [loading, setLoading] = React.useState(() => !estadosCache)
+  const [loading, setLoading] = React.useState(
+    () => !!state && !cidadesCache.has(state),
+  )
   const [error, setError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
-    if (estadosCache) return
+    if (!state) {
+      setCidadesOptions([])
+      setLoading(false)
+      return
+    }
+
+    const cached = cidadesCache.get(state)
+    if (cached) {
+      setCidadesOptions(cached)
+      setLoading(false)
+      return
+    }
 
     const controller = new AbortController()
+    setLoading(true)
+    setError(null)
 
-    fetchEstadosWithCache(controller.signal)
+    fetchCidadesWithCache(state, controller.signal)
       .then((options) => {
         if (!controller.signal.aborted) {
-          setEstadosOptions(options)
+          setCidadesOptions(options)
           setLoading(false)
         }
       })
       .catch((err) => {
         if (!controller.signal.aborted) {
-          setError("Erro ao carregar estados")
+          setError("Erro ao carregar cidades")
           setLoading(false)
           console.error(err)
         }
@@ -114,19 +128,7 @@ export function SelectEstado({
     return () => {
       controller.abort()
     }
-  }, [])
-
-  const selectedOption = React.useMemo(
-    () => estadosOptions.find((opt) => opt.value === value) ?? null,
-    [estadosOptions, value],
-  )
-
-  const handleValueChange = React.useCallback(
-    (option: IEstadoOption | null) => {
-      onValueChange?.(option?.value ?? null)
-    },
-    [onValueChange],
-  )
+  }, [state])
 
   if (error) {
     return (
@@ -143,11 +145,9 @@ export function SelectEstado({
 
   return (
     <Combobox
-      items={estadosOptions}
-      itemToStringValue={(estado: IEstadoOption) => estado.label}
-      value={selectedOption}
-      onValueChange={handleValueChange}
-      autoHighlight
+      items={cidadesOptions}
+      value={value ?? ""}
+      onValueChange={onValueChange}
     >
       <ComboboxInput
         placeholder={loading ? "Carregando..." : placeholder}
@@ -163,11 +163,11 @@ export function SelectEstado({
         )}
       </ComboboxInput>
       <ComboboxContent>
-        <ComboboxEmpty>Nenhum estado encontrado.</ComboboxEmpty>
+        <ComboboxEmpty>Nenhuma cidade encontrada.</ComboboxEmpty>
         <ComboboxList className="max-h-[30vh] w-full">
-          {(item: IEstadoOption) => (
-            <ComboboxItem key={item.value} value={item}>
-              {item.label}
+          {(item) => (
+            <ComboboxItem key={item} value={item}>
+              {item}
             </ComboboxItem>
           )}
         </ComboboxList>

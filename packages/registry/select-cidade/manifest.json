@@ -1,0 +1,33 @@
+{
+  "name"                : "select-cidade",
+  "description"         : "Combobox para seleção de cidades brasileiros com fetch dinâmico da API do IBGE",
+  "version"             : "1.0.0",
+  "registryDependencies": ["combobox", "input-group"],
+  "dependencies"        : [],
+  "devDependencies"     : [],
+  "frameworks"          : {
+    "nextjs": {
+      "files"   : [
+        {"name": "select-cidade.tsx", "target": "components"                                  },
+        {"name": "actions.ts",        "target": "actions",    "targetName": "select-cidade.ts"}
+      ],
+      "withForm": {
+        "files"               : [
+          {"name": "select-cidade-form.tsx", "target": "components", "targetName": "select-cidade.tsx"}
+        ],
+        "dependencies"        : ["react-hook-form", "@hookform/resolvers", "zod"],
+        "registryDependencies": ["form"]
+      }
+    },
+    "vite"  : {
+      "files"   : [ {"name": "select-cidade.tsx", "target": "components"} ],
+      "withForm": {
+        "files"               : [
+          {"name": "select-cidade-form.tsx", "target": "components", "targetName": "select-cidade.tsx"}
+        ],
+        "dependencies"        : ["react-hook-form", "@hookform/resolvers", "zod"],
+        "registryDependencies": ["form"]
+      }
+    }
+  }
+}

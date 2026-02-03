@@ -2,6 +2,7 @@ import { Loader2 } from "lucide-react"
 import * as React from "react"
 import type { ControllerProps, FieldPath, FieldValues } from "react-hook-form"
 
+import { getCidades } from "@/actions/select-cidade"
 import {
   Combobox,
   ComboboxContent,
@@ -21,61 +22,34 @@ import {
 import { InputGroupAddon } from "@/components/ui/input-group"
 import { cn } from "@/lib/utils"
 
-interface IEstadoOption {
-  label: string
-  value: string
-}
+// Module-level cache for cidades by state
+const cidadesCache = new Map<string, string[]>()
+const cidadesFetchPromises = new Map<string, Promise<string[]>>()
 
-const IBGE_API_URL =
-  "https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome"
-  
-// Module-level cache for estados (static data)
-let estadosCache: IEstadoOption[] | null = null
-let estadosFetchEntry: {
-  promise: Promise<IEstadoOption[]>
-  controller: AbortController
-} | null = null
+async function fetchCidadesWithCache(state: string): Promise<string[]> {
+  const cached = cidadesCache.get(state)
+  if (cached) return cached
 
-async function fetchEstadosWithCache(
-  signal?: AbortSignal,
-): Promise<IEstadoOption[]> {
-  if (estadosCache) return estadosCache
-
-  if (!estadosFetchEntry) {
-    const controller = new AbortController()
-    const promise = fetch(IBGE_API_URL, { signal: controller.signal })
+  let promise = cidadesFetchPromises.get(state)
+  if (!promise) {
+    promise = getCidades(state)
       .then((response) => {
-        if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
-        return response.json() as Promise<{ nome: string; sigla: string }[]>
-      })
-      .then((data) => {
-        const options = data.map((estado) => ({
-          label: `${estado.nome} (${estado.sigla})`,
-          value: estado.sigla,
-        }))
-        estadosCache = options
-        estadosFetchEntry = null
+        const options = response.map((cidade) => cidade.nome)
+        cidadesCache.set(state, options)
+        cidadesFetchPromises.delete(state)
         return options
       })
       .catch((error) => {
-        estadosFetchEntry = null
+        cidadesFetchPromises.delete(state)
         throw error
       })
-    estadosFetchEntry = { promise, controller }
+    cidadesFetchPromises.set(state, promise)
   }
 
-  // If caller provided a signal, abort the shared request when caller aborts
-  signal?.addEventListener("abort", () => {
-    if (estadosFetchEntry) {
-      estadosFetchEntry.controller.abort()
-      estadosFetchEntry = null
-    }
-  })
-
-  return estadosFetchEntry.promise
+  return promise
 }
 
-interface ISelectEstadoProps {
+interface ISelectCidadeProps {
   value?: string
   onValueChange?: (value: string | null) => void
   placeholder?: string
@@ -83,59 +57,64 @@ interface ISelectEstadoProps {
   invalid?: boolean
   className?: string
   showClear?: boolean
+  state: string | null
 }
 
-export function SelectEstado({
+export function SelectCidade({
   value,
   onValueChange,
-  placeholder = "Selecione um estado...",
+  placeholder = "Selecione uma cidade...",
   disabled = false,
   invalid = false,
   className,
   showClear = false,
-}: ISelectEstadoProps) {
-  const [estadosOptions, setEstadosOptions] = React.useState<IEstadoOption[]>(
-    () => estadosCache ?? [],
+  state,
+}: ISelectCidadeProps) {
+  const [cidadesOptions, setCidadesOptions] = React.useState<string[]>(
+    () => (state ? cidadesCache.get(state) ?? [] : []),
   )
-  const [loading, setLoading] = React.useState(() => !estadosCache)
+  const [loading, setLoading] = React.useState(
+    () => !!state && !cidadesCache.has(state),
+  )
   const [error, setError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
-    if (estadosCache) return
+    if (!state) {
+      setCidadesOptions([])
+      setLoading(false)
+      return
+    }
 
-    const controller = new AbortController()
+    const cached = cidadesCache.get(state)
+    if (cached) {
+      setCidadesOptions(cached)
+      setLoading(false)
+      return
+    }
 
-    fetchEstadosWithCache(controller.signal)
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+
+    fetchCidadesWithCache(state)
       .then((options) => {
-        if (!controller.signal.aborted) {
-          setEstadosOptions(options)
+        if (!cancelled) {
+          setCidadesOptions(options)
           setLoading(false)
         }
       })
       .catch((err) => {
-        if (!controller.signal.aborted) {
-          setError("Erro ao carregar estados")
+        if (!cancelled) {
+          setError("Erro ao carregar cidades")
           setLoading(false)
           console.error(err)
         }
       })
 
     return () => {
-      controller.abort()
+      cancelled = true
     }
-  }, [])
-
-  const selectedOption = React.useMemo(
-    () => estadosOptions.find((opt) => opt.value === value) ?? null,
-    [estadosOptions, value],
-  )
-
-  const handleValueChange = React.useCallback(
-    (option: IEstadoOption | null) => {
-      onValueChange?.(option?.value ?? null)
-    },
-    [onValueChange],
-  )
+  }, [state])
 
   if (error) {
     return (
@@ -152,11 +131,9 @@ export function SelectEstado({
 
   return (
     <Combobox
-      items={estadosOptions}
-      itemToStringValue={(estado: IEstadoOption) => estado.label}
-      value={selectedOption}
-      onValueChange={handleValueChange}
-      autoHighlight
+      items={cidadesOptions}
+      value={value ?? ""}
+      onValueChange={onValueChange}
     >
       <ComboboxInput
         placeholder={loading ? "Carregando..." : placeholder}
@@ -172,11 +149,11 @@ export function SelectEstado({
         )}
       </ComboboxInput>
       <ComboboxContent>
-        <ComboboxEmpty>Nenhum estado encontrado.</ComboboxEmpty>
+        <ComboboxEmpty>Nenhuma cidade encontrada.</ComboboxEmpty>
         <ComboboxList className="max-h-[30vh] w-full">
-          {(item: IEstadoOption) => (
-            <ComboboxItem key={item.value} value={item}>
-              {item.label}
+          {(item) => (
+            <ComboboxItem key={item} value={item}>
+              {item}
             </ComboboxItem>
           )}
         </ComboboxList>
@@ -185,18 +162,19 @@ export function SelectEstado({
   )
 }
 
-export const SelectEstadoForm = <
+export const SelectCidadeForm = <
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 >({
   name,
-  label = "Estado",
+  label = "Cidade",
   helper,
   required,
   readOnly,
   className,
   posLabel,
   disabled,
+  state,
   ...props
 }: Omit<ControllerProps<TFieldValues, TName>, "render"> & {
   label?: string
@@ -205,6 +183,7 @@ export const SelectEstadoForm = <
   readOnly?: boolean
   helper?: string | React.ReactNode
   posLabel?: React.ReactNode
+  state: string | null
 }) => {
   return (
     <FormField
@@ -222,11 +201,12 @@ export const SelectEstadoForm = <
             {posLabel}
           </div>
           <FormControl>
-            <SelectEstado
+            <SelectCidade
               value={field.value}
               onValueChange={field.onChange}
               disabled={readOnly || disabled}
               invalid={!!fieldState.error}
+              state={state}
             />
           </FormControl>
           {helper && typeof helper === "string" && (

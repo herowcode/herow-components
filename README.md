@@ -6,10 +6,10 @@ CLI privada para instalação de componentes React diretamente do GitHub, inspir
 
 ```bash
 # Inicializar no seu projeto
-npx @herow/cli init
+npx @herowcode/cli init
 
 # Adicionar um componente
-npx @herow/cli add select-estado
+npx @herowcode/cli add select-estado
 ```
 
 ## Como Funciona
@@ -28,8 +28,8 @@ A CLI detecta automaticamente o tipo do seu projeto (Next.js ou Vite) e ajusta:
 Inicializa a configuração do Herow no seu projeto.
 
 ```bash
-npx @herow/cli init
-npx @herow/cli init -y  # Pular prompts
+npx @herowcode/cli init
+npx @herowcode/cli init -y  # Pular prompts
 ```
 
 ### `add <componente>`
@@ -37,9 +37,9 @@ npx @herow/cli init -y  # Pular prompts
 Adiciona um componente ao seu projeto.
 
 ```bash
-npx @herow/cli add select-estado
-npx @herow/cli add select-estado --with-form  # Com React Hook Form
-npx @herow/cli add select-estado --no-deps    # Sem instalar deps
+npx @herowcode/cli add select-estado
+npx @herowcode/cli add select-estado --with-form  # Com React Hook Form
+npx @herowcode/cli add select-estado --no-deps    # Sem instalar deps
 ```
 
 ### `list`
@@ -47,7 +47,7 @@ npx @herow/cli add select-estado --no-deps    # Sem instalar deps
 Lista todos os componentes disponíveis.
 
 ```bash
-npx @herow/cli list
+npx @herowcode/cli list
 ```
 
 ## Componentes Disponíveis
