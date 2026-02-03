@@ -56,6 +56,13 @@ npx @herowcode/cli list
 
 Combobox para seleção de estados brasileiros com fetch dinâmico da API do IBGE.
 
+**Características:**
+- Cache automático em nível de módulo (dados estáticos)
+- Fetch compartilhado entre múltiplas instâncias
+- Suporte a abort signal (Vite)
+- Loading states e error handling
+- Integração com React Hook Form
+
 **Uso básico:**
 
 ```tsx
@@ -69,6 +76,7 @@ export function MeuFormulario() {
       value={estado}
       onValueChange={setEstado}
       placeholder="Selecione um estado"
+      showClear
     />
   )
 }
@@ -86,6 +94,89 @@ import { SelectEstadoField } from "@/components/ui/select-estado-field"
   description="Selecione o estado"
 />
 ```
+
+**Props:**
+- `value?: string` - Sigla do estado selecionado (ex: "SP")
+- `onValueChange?: (value: string | null) => void` - Callback de mudança
+- `placeholder?: string` - Texto do placeholder
+- `disabled?: boolean` - Desabilita o componente
+- `invalid?: boolean` - Estado de validação
+- `showClear?: boolean` - Exibe botão de limpar
+- `className?: string` - Classes CSS customizadas
+
+### select-cidade
+
+Combobox para seleção de cidades brasileiras com fetch dinâmico da API do IBGE baseado no estado.
+
+**Características:**
+- Cache por estado em nível de módulo
+- Fetch compartilhado para o mesmo estado
+- Recarrega automaticamente ao mudar o estado
+- Loading states e error handling
+- Integração com React Hook Form
+
+**Uso básico:**
+
+```tsx
+import { SelectEstado } from "@/components/ui/select-estado"
+import { SelectCidade } from "@/components/ui/select-cidade"
+
+export function MeuFormulario() {
+  const [estado, setEstado] = useState("")
+  const [cidade, setCidade] = useState("")
+
+  return (
+    <>
+      <SelectEstado
+        value={estado}
+        onValueChange={(value) => {
+          setEstado(value ?? "")
+          setCidade("") // Limpa a cidade ao trocar estado
+        }}
+      />
+      
+      <SelectCidade
+        value={cidade}
+        onValueChange={(value) => setCidade(value ?? "")}
+        state={estado}
+        disabled={!estado}
+      />
+    </>
+  )
+}
+```
+
+**Com React Hook Form:**
+
+```tsx
+import { SelectEstadoField } from "@/components/ui/select-estado-field"
+import { SelectCidadeField } from "@/components/ui/select-cidade-field"
+
+// Dentro do seu FormProvider:
+const estado = watch("estado")
+
+<SelectEstadoField
+  name="estado"
+  label="Estado"
+/>
+
+<SelectCidadeField
+  name="cidade"
+  label="Cidade"
+  state={estado}
+  disabled={!estado}
+/>
+```
+
+**Props:**
+- `value?: string` - Nome da cidade selecionada
+- `onValueChange?: (value: string | null) => void` - Callback de mudança
+- `state: string | null` - **Obrigatório** - Sigla do estado para buscar cidades
+- `placeholder?: string` - Texto do placeholder
+- `disabled?: boolean` - Desabilita o componente
+- `invalid?: boolean` - Estado de validação
+- `showClear?: boolean` - Exibe botão de limpar
+- `className?: string` - Classes CSS customizadas
 
 ## Configuração
 
@@ -122,11 +213,24 @@ herow-components/
 │   │   └── package.json
 │   │
 │   └── registry/               # Código fonte dos componentes
-│       └── select-estado/
+│       ├── select-estado/
+│       │   ├── manifest.json
+│       │   ├── nextjs/
+│       │   │   ├── select-estado.tsx
+│       │   │   ├── select-estado-form.tsx
+│       │   │   └── actions.ts
+│       │   └── vite/
+│       │       ├── select-estado.tsx
+│       │       └── select-estado-field.tsx
+│       └── select-cidade/
 │           ├── manifest.json
-│           ├── select-estado.tsx
-│           ├── select-estado-field.tsx
-│           └── actions.ts
+│           ├── nextjs/
+│           │   ├── select-cidade.tsx
+│           │   ├── select-cidade-form.tsx
+│           │   └── actions.ts
+│           └── vite/
+│               ├── select-cidade.tsx
+│               └── select-cidade-form.tsx
 │
 ├── package.json
 └── pnpm-workspace.yaml
@@ -172,7 +276,7 @@ npx github:herowcode/herow-components add select-estado
 
 1. Crie a pasta em `packages/registry/MEU-COMPONENTE/`
 2. Adicione o `manifest.json` com metadados
-3. Adicione os arquivos do componente
+3. Adicione os arquivos do componente (separados por framework se necessário)
 4. Registre em `packages/cli/src/registry/index.ts`
 
 Exemplo de manifest:
@@ -181,11 +285,20 @@ Exemplo de manifest:
 {
   "name": "meu-componente",
   "description": "Descrição do componente",
-  "dependencies": ["alguma-lib"],
-  "registryDependencies": ["button", "popover"],
-  "files": [
-    { "name": "meu-componente.tsx", "path": "meu-componente.tsx", "type": "component" }
-  ]
+  "registryDependencies": ["combobox", "input-group"],
+  "dependencies": [],
+  "frameworks": {
+    "nextjs": {
+      "files": [
+        { "name": "meu-componente.tsx", "target": "components" }
+      ]
+    },
+    "vite": {
+      "files": [
+        { "name": "meu-componente.tsx", "target": "components" }
+      ]
+    }
+  }
 }
 ```
 
