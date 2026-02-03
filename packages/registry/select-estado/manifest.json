@@ -1,0 +1,37 @@
+{
+  "name": "select-estado",
+  "description": "Combobox para seleção de estados brasileiros com fetch dinâmico da API do IBGE",
+  "version": "1.0.0",
+  "registryDependencies": ["combobox"],
+  "dependencies": [],
+  "devDependencies": [],
+  "frameworks": {
+    "nextjs": {
+      "files": [
+        { "name": "select-estado.tsx", "target": "components" },
+        { "name": "select-estado-client.tsx", "target": "components" },
+        { "name": "actions.ts", "target": "actions", "targetName": "select-estado.ts" }
+      ],
+      "withForm": {
+        "files": [
+          { "name": "select-estado-field.tsx", "target": "components" },
+          { "name": "select-estado-field-client.tsx", "target": "components" }
+        ],
+        "dependencies": ["react-hook-form", "@hookform/resolvers", "zod"],
+        "registryDependencies": ["form"]
+      }
+    },
+    "vite": {
+      "files": [
+        { "name": "select-estado.tsx", "target": "components" }
+      ],
+      "withForm": {
+        "files": [
+          { "name": "select-estado-field.tsx", "target": "components" }
+        ],
+        "dependencies": ["react-hook-form", "@hookform/resolvers", "zod"],
+        "registryDependencies": ["form"]
+      }
+    }
+  }
+}
