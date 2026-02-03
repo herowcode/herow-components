@@ -1,7 +1,7 @@
 {
   "name"                : "select-cidade",
   "description"         : "Combobox para seleção de cidades brasileiros com fetch dinâmico da API do IBGE",
-  "version"             : "1.0.0",
+  "version"             : "1.0.1",
   "registryDependencies": ["combobox", "input-group"],
   "dependencies"        : [],
   "devDependencies"     : [],

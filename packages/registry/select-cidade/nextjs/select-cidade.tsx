@@ -69,11 +69,27 @@ export function SelectCidade({
   )
   const [error, setError] = React.useState<string | null>(null)
 
+  // Track previous state to detect actual changes
+  const prevStateRef = React.useRef(state)
+  // Flag to indicate we need to validate after cities load (only when state changes)
+  const [pendingValidation, setPendingValidation] = React.useState(false)
+
+  // Effect to load cities when state changes
   React.useEffect(() => {
+    const stateActuallyChanged = prevStateRef.current !== state
+    prevStateRef.current = state
+
     if (!state) {
       setCidadesOptions([])
       setLoading(false)
+      if (stateActuallyChanged) {
+        onValueChange?.(null)
+      }
       return
+    }
+
+    if (stateActuallyChanged) {
+      setPendingValidation(true)
     }
 
     const cached = cidadesCache.get(state)
@@ -105,7 +121,33 @@ export function SelectCidade({
     return () => {
       cancelled = true
     }
-  }, [state])
+  }, [state, onValueChange])
+
+  // Effect to validate value ONLY when state changed and cities are ready
+  React.useEffect(() => {
+    // Only validate if we have a pending validation from a state change
+    if (!pendingValidation) return
+    // Wait for cities to load
+    if (loading || cidadesOptions.length === 0) return
+
+    // Clear the pending validation flag
+    setPendingValidation(false)
+
+    // Clear value if it doesn't exist in the cities array
+    if (value && !cidadesOptions.includes(value)) {
+      onValueChange?.(null)
+    }
+  }, [pendingValidation, cidadesOptions, loading, value, onValueChange])
+
+  // Include current value in items while loading to prevent Combobox from clearing it
+  const effectiveOptions = React.useMemo(() => {
+    // If we have a value and it's not in cidadesOptions, temporarily include it
+    // This prevents the Combobox from clearing the value before cities load
+    if (value && cidadesOptions.length === 0) {
+      return [value]
+    }
+    return cidadesOptions
+  }, [value, cidadesOptions])
 
   if (error) {
     return (
@@ -122,7 +164,7 @@ export function SelectCidade({
 
   return (
     <Combobox
-      items={cidadesOptions}
+      items={effectiveOptions}
       value={value ?? ""}
       onValueChange={onValueChange}
     >
